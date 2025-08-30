@@ -71,6 +71,6 @@ class StochasticPseudonymizer:
     # string
     return base64.b64encode(
         token_value.to_bytes(
-            (token_value.bit_length() + 7) // 8, byteorder='big'
+            max(1, (token_value.bit_length() + 7) // 8), byteorder='big'
         )
     ).decode('utf-8').rstrip('=')
