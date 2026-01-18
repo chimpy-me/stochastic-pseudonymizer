@@ -1,76 +1,42 @@
-import base64
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import constant_time
-import math
-import os
+import hmac
+import hashlib
 
 
 class StochasticPseudonymizer:
-  def __init__(
-      self,
-      app_secret,                 # protect this secret
-      population_size=300_000,    # number of items
-      target_probability=0.99999, # target collision probability
-      iterations=100_000          # PBKDF2 iterations
-  ):
+    """
+    Generate pseudonymous tokens from patron IDs with built-in plausible
+    deniability through intentional hash collisions.
 
-    self.app_secret = app_secret
-    self.iterations = iterations
+    Args:
+        app_secret: Secret key for token generation. Keep this safe.
+        token_length: Number of hex characters in output (1-32). Recommended:
+                      5 for small libraries (up to ~100k lifetime patrons)
+                      6 for medium libraries (up to ~1.5M lifetime patrons)
+                      7 for large consortia (up to ~25M lifetime patrons)
+    """
 
-    # Calculate the number of bins for the desired collision 
-    # probability
-    self.num_bins = int(
-        self.calculate_num_bins(
-            population_size,
-            target_probability
-        )
-    )
+    def __init__(self, app_secret: str, token_length: int = 6):
+        if not app_secret:
+            raise ValueError("app_secret cannot be empty")
+        if not isinstance(token_length, int) or not (1 <= token_length <= 32):
+            raise ValueError("token_length must be an integer between 1 and 32")
 
-    # Calculate the number of bits required
-    self.num_bits = math.ceil(math.log2(self.num_bins))
-    # Calculate the number of bytes required for the given 
-    # number of bits
-    self.num_bytes = (self.num_bits + 7) // 8
+        self._secret = app_secret.encode("utf-8")
+        self._length = token_length
 
-  @staticmethod
-  def calculate_num_bins(population_size, target_probability):
-    return population_size**2 / \
-        (-2 * math.log(1 - target_probability))
+    def generate_token(self, patron_id: str) -> str:
+        """
+        Generate a pseudonymous token for a patron ID.
 
-  def generate_token(self, pii, patron_record):
-    # Calculate the salt using PII, app_secret, and patron record 
-    # fields
-    salt = (
-        str(pii)
-        + self.app_secret
-        + str(patron_record['id'])
-        + str(patron_record['createdDate'])
-    ).encode('utf-8')
+        Args:
+            patron_id: The patron identifier to pseudonymize.
 
-    # PBKDF2 hashing with length determined by self.num_bytes
-    hash_value = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=self.num_bytes,
-        salt=salt,
-        iterations=self.iterations,
-        backend=default_backend()
-    ).derive(
-        str(pii).encode('utf-8')
-    )
-
-    # Convert the hash value to an integer and take it modulus
-    # num_bins
-    token_value = int.from_bytes(
-        hash_value,
-        byteorder='big'
-    ) % self.num_bins
-
-    # Convert the integer token value to bytes and then to a base64 
-    # string
-    return base64.b64encode(
-        token_value.to_bytes(
-            max(1, (token_value.bit_length() + 7) // 8), byteorder='big'
-        )
-    ).decode('utf-8').rstrip('=')
+        Returns:
+            A hexadecimal token string of length `token_length`.
+        """
+        digest = hmac.new(
+            self._secret,
+            str(patron_id).encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return digest[: self._length]

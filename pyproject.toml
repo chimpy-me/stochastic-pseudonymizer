@@ -1,0 +1,24 @@
+[project]
+name = "stochastic-pseudonymizer"
+version = "1.0.0"
+description = "Generate pseudonymous tokens with built-in plausible deniability"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Ray Voelker", email = "ray.voelker@gmail.com" }
+]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/chimpy-me/stochastic-pseudonymizer"
+Repository = "https://github.com/chimpy-me/stochastic-pseudonymizer"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
